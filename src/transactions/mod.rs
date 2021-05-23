@@ -560,6 +560,7 @@ mod tests {
         (Vec<bip32::ExtendedPrivKey>, Vec<DescriptorPublicKey>),
         (Vec<bip32::ExtendedPrivKey>, Vec<DescriptorPublicKey>),
         (Vec<bip32::ExtendedPrivKey>, Vec<DescriptorPublicKey>),
+        (Vec<bip32::ExtendedPrivKey>, Vec<DescriptorPublicKey>),
     ) {
         let mut rng = fastrand::Rng::new();
 
@@ -577,6 +578,21 @@ mod tests {
                 })
             })
             .collect::<Vec<DescriptorPublicKey>>();
+        let mancpfp_priv = (0..n_man)
+            .map(|_| get_random_privkey(&mut rng))
+            .collect::<Vec<bip32::ExtendedPrivKey>>();
+        let mancpfp = managers_priv
+            .iter()
+            .map(|xpriv| {
+                DescriptorPublicKey::XPub(DescriptorXKey {
+                    origin: None,
+                    xkey: bip32::ExtendedPubKey::from_private(&secp, &xpriv),
+                    derivation_path: bip32::DerivationPath::from(vec![]),
+                    wildcard: Wildcard::Unhardened,
+                })
+            })
+            .collect::<Vec<DescriptorPublicKey>>();
+
 
         let stakeholders_priv = (0..n_stk)
             .map(|_| get_random_privkey(&mut rng))
@@ -610,6 +626,7 @@ mod tests {
 
         (
             (managers_priv, managers),
+            (mancpfp_priv, mancpfp),
             (stakeholders_priv, stakeholders),
             (cosigners_priv, cosigners),
         )
@@ -717,6 +734,7 @@ mod tests {
         // Keys, keys, keys everywhere !
         let (
             (managers_priv, managers),
+            (_, mancpfp),
             (stakeholders_priv, stakeholders),
             (cosigners_priv, cosigners),
         ) = get_participants_sets(n_stk, n_man, secp);
@@ -731,7 +749,7 @@ mod tests {
         )?;
         assert_eq!(unvault_descriptor.csv_value(), csv);
         let cpfp_descriptor =
-            CpfpDescriptor::new(managers).expect("Unvault CPFP descriptor generation error");
+            CpfpDescriptor::new(mancpfp).expect("Unvault CPFP descriptor generation error");
         let deposit_descriptor =
             DepositDescriptor::new(stakeholders).expect("Deposit descriptor generation error");
 
