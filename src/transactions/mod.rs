@@ -564,65 +564,49 @@ mod tests {
     ) {
         let mut rng = fastrand::Rng::new();
 
-        let managers_priv = (0..n_man)
-            .map(|_| get_random_privkey(&mut rng))
-            .collect::<Vec<bip32::ExtendedPrivKey>>();
-        let managers = managers_priv
-            .iter()
-            .map(|xpriv| {
-                DescriptorPublicKey::XPub(DescriptorXKey {
-                    origin: None,
-                    xkey: bip32::ExtendedPubKey::from_private(&secp, &xpriv),
-                    derivation_path: bip32::DerivationPath::from(vec![]),
-                    wildcard: Wildcard::Unhardened,
-                })
-            })
-            .collect::<Vec<DescriptorPublicKey>>();
-        let mancpfp_priv = (0..n_man)
-            .map(|_| get_random_privkey(&mut rng))
-            .collect::<Vec<bip32::ExtendedPrivKey>>();
-        let mancpfp = managers_priv
-            .iter()
-            .map(|xpriv| {
-                DescriptorPublicKey::XPub(DescriptorXKey {
-                    origin: None,
-                    xkey: bip32::ExtendedPubKey::from_private(&secp, &xpriv),
-                    derivation_path: bip32::DerivationPath::from(vec![]),
-                    wildcard: Wildcard::Unhardened,
-                })
-            })
-            .collect::<Vec<DescriptorPublicKey>>();
+        let mut managers_priv = Vec::with_capacity(n_man);
+        let mut managers = Vec::with_capacity(n_man);
+        let mut mancpfp_priv = Vec::with_capacity(n_man);
+        let mut mancpfp = Vec::with_capacity(n_man);
+        for i in 0..n_man {
+            managers_priv.push(get_random_privkey(&mut rng));
+            managers.push(DescriptorPublicKey::XPub(DescriptorXKey {
+                origin: None,
+                xkey: bip32::ExtendedPubKey::from_private(&secp, &managers_priv[i]),
+                derivation_path: bip32::DerivationPath::from(vec![]),
+                wildcard: Wildcard::Unhardened,
+            }));
 
+            mancpfp_priv.push(get_random_privkey(&mut rng));
+            mancpfp.push(DescriptorPublicKey::XPub(DescriptorXKey {
+                origin: None,
+                xkey: bip32::ExtendedPubKey::from_private(&secp, &mancpfp_priv[i]),
+                derivation_path: bip32::DerivationPath::from(vec![]),
+                wildcard: Wildcard::Unhardened,
+            }));
+        }
 
-        let stakeholders_priv = (0..n_stk)
-            .map(|_| get_random_privkey(&mut rng))
-            .collect::<Vec<bip32::ExtendedPrivKey>>();
-        let stakeholders = stakeholders_priv
-            .iter()
-            .map(|xpriv| {
-                DescriptorPublicKey::XPub(DescriptorXKey {
-                    origin: None,
-                    xkey: bip32::ExtendedPubKey::from_private(&secp, &xpriv),
-                    derivation_path: bip32::DerivationPath::from(vec![]),
-                    wildcard: Wildcard::Unhardened,
-                })
-            })
-            .collect::<Vec<DescriptorPublicKey>>();
+        let mut stakeholders_priv = Vec::with_capacity(n_stk);
+        let mut stakeholders = Vec::with_capacity(n_stk);
+        let mut cosigners_priv = Vec::with_capacity(n_stk);
+        let mut cosigners = Vec::with_capacity(n_stk);
+        for i in 0..n_stk {
+            stakeholders_priv.push(get_random_privkey(&mut rng));
+            stakeholders.push(DescriptorPublicKey::XPub(DescriptorXKey {
+                origin: None,
+                xkey: bip32::ExtendedPubKey::from_private(&secp, &stakeholders_priv[i]),
+                derivation_path: bip32::DerivationPath::from(vec![]),
+                wildcard: Wildcard::Unhardened,
+            }));
 
-        let cosigners_priv = (0..n_stk)
-            .map(|_| get_random_privkey(&mut rng))
-            .collect::<Vec<bip32::ExtendedPrivKey>>();
-        let cosigners = cosigners_priv
-            .iter()
-            .map(|xpriv| {
-                DescriptorPublicKey::XPub(DescriptorXKey {
-                    origin: None,
-                    xkey: bip32::ExtendedPubKey::from_private(&secp, &xpriv),
-                    derivation_path: bip32::DerivationPath::from(vec![]),
-                    wildcard: Wildcard::Unhardened,
-                })
-            })
-            .collect::<Vec<DescriptorPublicKey>>();
+            cosigners_priv.push(get_random_privkey(&mut rng));
+            cosigners.push(DescriptorPublicKey::XPub(DescriptorXKey {
+                origin: None,
+                xkey: bip32::ExtendedPubKey::from_private(&secp, &cosigners_priv[i]),
+                derivation_path: bip32::DerivationPath::from(vec![]),
+                wildcard: Wildcard::Unhardened,
+            }));
+        }
 
         (
             (managers_priv, managers),
@@ -641,7 +625,6 @@ mod tests {
         xprivs: &Vec<bip32::ExtendedPrivKey>,
         child_number: Option<bip32::ChildNumber>,
     ) -> Result<(), Error> {
-        // Can we agree that rustfmt does some nasty formatting now ??
         let derivation_path = bip32::DerivationPath::from(if let Some(cn) = child_number {
             vec![cn]
         } else {
