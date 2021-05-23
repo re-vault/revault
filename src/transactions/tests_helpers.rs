@@ -145,6 +145,7 @@ pub fn derive_transactions(
     n_stk: usize,
     n_man: usize,
     csv: u32,
+    deposit_prevout: OutPoint,
     deposit_value: u64,
     // Outpoint and amount of inputs of a Spend
     unvault_spends: Vec<(OutPoint, u64)>,
@@ -199,10 +200,7 @@ pub fn derive_transactions(
         version: 2,
         lock_time: 0,
         input: vec![TxIn {
-            previous_output: OutPoint::from_str(
-                "39a8212c6a9b467680d43e47b61b8363fe1febb761f9f548eb4a432b2bc9bbec:0",
-            )
-            .unwrap(),
+            previous_output: deposit_prevout,
             ..TxIn::default()
         }],
         output: vec![TxOut {

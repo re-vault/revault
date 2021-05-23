@@ -539,6 +539,10 @@ mod tests {
         let csv = fastrand::u32(..SEQUENCE_LOCKTIME_MASK);
         eprintln!("Using a CSV of '{}'", csv);
 
+        let deposit_prevout = OutPoint::from_str(
+            "39a8212c6a9b467680d43e47b61b8363fe1febb761f9f548eb4a432b2bc9bbec:0",
+        )
+        .unwrap();
         let unvaults_spent = vec![
             (
                 OutPoint::from_str(
@@ -572,9 +576,17 @@ mod tests {
 
         // Test the dust limit
         assert_eq!(
-            derive_transactions(2, 1, csv, 234_631, unvaults_spent.clone(), &secp)
-                .unwrap_err()
-                .to_string(),
+            derive_transactions(
+                2,
+                1,
+                csv,
+                deposit_prevout,
+                234_631,
+                unvaults_spent.clone(),
+                &secp
+            )
+            .unwrap_err()
+            .to_string(),
             Error::TransactionCreation(TransactionCreationError::Dust).to_string()
         );
         // Non-minimal CSV
@@ -582,6 +594,7 @@ mod tests {
             2,
             1,
             SEQUENCE_LOCKTIME_MASK + 1,
+            deposit_prevout,
             300_000,
             unvaults_spent.clone(),
             &secp,
@@ -589,12 +602,30 @@ mod tests {
         .expect_err("Unclean CSV");
 
         // Absolute minimum
-        derive_transactions(2, 1, csv, 234_632, unvaults_spent.clone(), &secp).expect(&format!(
+        derive_transactions(
+            2,
+            1,
+            csv,
+            deposit_prevout,
+            234_632,
+            unvaults_spent.clone(),
+            &secp,
+        )
+        .expect(&format!(
             "Tx chain with 2 stakeholders, 1 manager, {} csv, 235_250 deposit",
             csv
         ));
         // 1 BTC
-        derive_transactions(8, 3, csv, COIN_VALUE, unvaults_spent.clone(), &secp).expect(&format!(
+        derive_transactions(
+            8,
+            3,
+            csv,
+            deposit_prevout,
+            COIN_VALUE,
+            unvaults_spent.clone(),
+            &secp,
+        )
+        .expect(&format!(
             "Tx chain with 8 stakeholders, 3 managers, {} csv, 1_000_000 deposit",
             csv
         ));
@@ -603,6 +634,7 @@ mod tests {
             8,
             3,
             csv,
+            deposit_prevout,
             100_000 * COIN_VALUE,
             unvaults_spent.clone(),
             &secp,
@@ -612,7 +644,16 @@ mod tests {
             csv
         ));
         // 100 BTC
-        derive_transactions(38, 5, csv, 100 * COIN_VALUE, unvaults_spent, &secp).expect(&format!(
+        derive_transactions(
+            38,
+            5,
+            csv,
+            deposit_prevout,
+            100 * COIN_VALUE,
+            unvaults_spent,
+            &secp,
+        )
+        .expect(&format!(
             "Tx chain with 38 stakeholders, 5 manager, {} csv, 100_000_000_000 deposit",
             csv
         ));
