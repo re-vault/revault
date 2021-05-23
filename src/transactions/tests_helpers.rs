@@ -146,6 +146,8 @@ pub fn derive_transactions(
     n_man: usize,
     csv: u32,
     deposit_value: u64,
+    // Outpoint and amount of inputs of a Spend
+    unvault_spends: Vec<(OutPoint, u64)>,
     secp: &secp256k1::Secp256k1<secp256k1::All>,
 ) -> Result<(), Error> {
     // Let's get the 10th key of each
@@ -623,43 +625,16 @@ pub fn derive_transactions(
     .expect_err("Creating a dust output");
 
     // The spend transaction can also batch multiple unvault txos
-    let spend_unvault_txins = vec![
-        UnvaultTxIn::new(
-            OutPoint::from_str(
-                "0ed7dc14fe8d1364b3185fa46e940cb8e858f8de32e63f88353a2bd66eb99e2a:0",
+    let spend_unvault_txins: Vec<UnvaultTxIn> = unvault_spends
+        .into_iter()
+        .map(|(outpoint, value)| {
+            UnvaultTxIn::new(
+                outpoint,
+                UnvaultTxOut::new(Amount::from_sat(value), &der_unvault_descriptor),
+                csv,
             )
-            .unwrap(),
-            UnvaultTxOut::new(Amount::from_sat(deposit_value), &der_unvault_descriptor),
-            csv,
-        ),
-        UnvaultTxIn::new(
-            OutPoint::from_str(
-                "23aacfca328942892bb007a86db0bf5337005f642b3c46aef50c23af03ec333a:1",
-            )
-            .unwrap(),
-            UnvaultTxOut::new(Amount::from_sat(deposit_value * 4), &der_unvault_descriptor),
-            csv,
-        ),
-        UnvaultTxIn::new(
-            OutPoint::from_str(
-                "fccabf4077b7e44ba02378a97a84611b545c11a1ef2af16cbb6e1032aa059b1d:0",
-            )
-            .unwrap(),
-            UnvaultTxOut::new(Amount::from_sat(deposit_value / 2), &der_unvault_descriptor),
-            csv,
-        ),
-        UnvaultTxIn::new(
-            OutPoint::from_str(
-                "71dc04303184d54e6cc2f92d843282df2854d6dd66f10081147b84aeed830ae1:0",
-            )
-            .unwrap(),
-            UnvaultTxOut::new(
-                Amount::from_sat(deposit_value * 50),
-                &der_unvault_descriptor,
-            ),
-            csv,
-        ),
-    ];
+        })
+        .collect();
     let n_txins = spend_unvault_txins.len();
     let dummy_txo = TxOut::default();
     let cpfp_value = SpendTransaction::cpfp_txout(

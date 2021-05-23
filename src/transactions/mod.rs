@@ -529,7 +529,9 @@ mod tests {
     use super::tests_helpers::derive_transactions;
     use crate::{error::*, scripts::*};
 
-    use miniscript::bitcoin::{blockdata::constants::COIN_VALUE, secp256k1};
+    use miniscript::bitcoin::{blockdata::constants::COIN_VALUE, secp256k1, OutPoint};
+
+    use std::str::FromStr;
 
     #[test]
     fn transaction_derivation() {
@@ -537,34 +539,80 @@ mod tests {
         let csv = fastrand::u32(..SEQUENCE_LOCKTIME_MASK);
         eprintln!("Using a CSV of '{}'", csv);
 
+        let unvaults_spent = vec![
+            (
+                OutPoint::from_str(
+                    "0ed7dc14fe8d1364b3185fa46e940cb8e858f8de32e63f88353a2bd66eb99e2a:0",
+                )
+                .unwrap(),
+                1_000_000,
+            ),
+            (
+                OutPoint::from_str(
+                    "23aacfca328942892bb007a86db0bf5337005f642b3c46aef50c23af03ec333a:1",
+                )
+                .unwrap(),
+                2_897_120,
+            ),
+            (
+                OutPoint::from_str(
+                    "fccabf4077b7e44ba02378a97a84611b545c11a1ef2af16cbb6e1032aa059b1d:0",
+                )
+                .unwrap(),
+                9_327_465_907_334,
+            ),
+            (
+                OutPoint::from_str(
+                    "71dc04303184d54e6cc2f92d843282df2854d6dd66f10081147b84aeed830ae1:0",
+                )
+                .unwrap(),
+                234_631,
+            ),
+        ];
+
         // Test the dust limit
         assert_eq!(
-            derive_transactions(2, 1, csv, 234_631, &secp)
+            derive_transactions(2, 1, csv, 234_631, unvaults_spent.clone(), &secp)
                 .unwrap_err()
                 .to_string(),
             Error::TransactionCreation(TransactionCreationError::Dust).to_string()
         );
         // Non-minimal CSV
-        derive_transactions(2, 1, SEQUENCE_LOCKTIME_MASK + 1, 300_000, &secp)
-            .expect_err("Unclean CSV");
+        derive_transactions(
+            2,
+            1,
+            SEQUENCE_LOCKTIME_MASK + 1,
+            300_000,
+            unvaults_spent.clone(),
+            &secp,
+        )
+        .expect_err("Unclean CSV");
 
         // Absolute minimum
-        derive_transactions(2, 1, csv, 234_632, &secp).expect(&format!(
+        derive_transactions(2, 1, csv, 234_632, unvaults_spent.clone(), &secp).expect(&format!(
             "Tx chain with 2 stakeholders, 1 manager, {} csv, 235_250 deposit",
             csv
         ));
         // 1 BTC
-        derive_transactions(8, 3, csv, COIN_VALUE, &secp).expect(&format!(
+        derive_transactions(8, 3, csv, COIN_VALUE, unvaults_spent.clone(), &secp).expect(&format!(
             "Tx chain with 8 stakeholders, 3 managers, {} csv, 1_000_000 deposit",
             csv
         ));
         // 100 000 BTC
-        derive_transactions(8, 3, csv, 100_000 * COIN_VALUE, &secp).expect(&format!(
+        derive_transactions(
+            8,
+            3,
+            csv,
+            100_000 * COIN_VALUE,
+            unvaults_spent.clone(),
+            &secp,
+        )
+        .expect(&format!(
             "Tx chain with 8 stakeholders, 3 managers, {} csv, 100_000_000_000_000 deposit",
             csv
         ));
         // 100 BTC
-        derive_transactions(38, 5, csv, 100 * COIN_VALUE, &secp).expect(&format!(
+        derive_transactions(38, 5, csv, 100 * COIN_VALUE, unvaults_spent, &secp).expect(&format!(
             "Tx chain with 38 stakeholders, 5 manager, {} csv, 100_000_000_000 deposit",
             csv
         ));
