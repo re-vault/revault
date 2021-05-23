@@ -6,7 +6,7 @@ use super::{
 
 use crate::{error::*, scripts::*, txins::*, txouts::*};
 
-use std::iter::repeat_with;
+use std::{collections::HashSet, iter::repeat_with, str::FromStr};
 
 use miniscript::{
     bitcoin::{
@@ -15,7 +15,7 @@ use miniscript::{
         Address, Amount, Network, OutPoint, SigHash, SigHashType, Transaction, TxIn, TxOut,
     },
     descriptor::{DescriptorPublicKey, DescriptorXKey, Wildcard},
-    Descriptor, DescriptorTrait,
+    Descriptor, DescriptorTrait, MiniscriptKey,
 };
 
 fn get_random_privkey(rng: &mut fastrand::Rng) -> bip32::ExtendedPrivKey {
@@ -140,6 +140,13 @@ fn satisfy_transaction_input(
     Ok(())
 }
 
+fn desc_san_check<P: MiniscriptKey>(desc: &Descriptor<P>) -> Result<(), ScriptCreationError> {
+    match desc {
+        Descriptor::Wsh(wsh) => wsh.sanity_check().map_err(|e| e.into()),
+        _ => unreachable!(),
+    }
+}
+
 /// Derive transactions for a given deployment configuration, asserting some invariants
 pub fn derive_transactions(
     n_stk: usize,
@@ -164,6 +171,17 @@ pub fn derive_transactions(
         (cosigners_priv, cosigners),
     ) = get_participants_sets(n_stk, n_man, secp);
 
+    let uniq_privs: HashSet<Vec<u8>> = managers_priv
+        .iter()
+        .chain(stakeholders_priv.iter())
+        .chain(cosigners_priv.iter())
+        .cloned()
+        .map(|xpriv| xpriv.private_key.to_bytes())
+        .collect();
+    if uniq_privs.len() != managers_priv.len() + stakeholders_priv.len() + cosigners_priv.len() {
+        return Ok(());
+    }
+
     // Get the script descriptors for the txos we're going to create
     let unvault_descriptor = UnvaultDescriptor::new(
         stakeholders.clone(),
@@ -177,6 +195,18 @@ pub fn derive_transactions(
         CpfpDescriptor::new(mancpfp).expect("Unvault CPFP descriptor generation error");
     let deposit_descriptor =
         DepositDescriptor::new(stakeholders).expect("Deposit descriptor generation error");
+
+    desc_san_check(
+        deposit_descriptor
+            .derive(child_number.into(), &secp)
+            .inner(),
+    )?;
+    desc_san_check(
+        unvault_descriptor
+            .derive(child_number.into(), &secp)
+            .inner(),
+    )?;
+    desc_san_check(cpfp_descriptor.derive(child_number.into(), &secp).inner())?;
 
     // We reuse the deposit descriptor for the emergency address
     let emergency_address = EmergencyAddress::from(Address::p2wsh(
@@ -622,6 +652,11 @@ pub fn derive_transactions(
     .expect_err("Creating a dust output");
 
     // The spend transaction can also batch multiple unvault txos
+    if unvault_spends.len() == 0 {
+        return Err(Error::TransactionCreation(
+            TransactionCreationError::NegativeFees,
+        ));
+    }
     let spend_unvault_txins: Vec<UnvaultTxIn> = unvault_spends
         .into_iter()
         .map(|(outpoint, value)| {
@@ -695,12 +730,9 @@ pub fn derive_transactions(
                 assert_eq!($tx, deserialized_tx);
             }
 
-            #[cfg(not(feature = "use-serde"))]
-            {
-                let serialized_tx = $tx.to_string();
-                let deserialized_tx: $tx_type = FromStr::from_str(&serialized_tx).unwrap();
-                assert_eq!($tx, deserialized_tx);
-            }
+            let serialized_tx = $tx.to_string();
+            let deserialized_tx: $tx_type = FromStr::from_str(&serialized_tx).unwrap();
+            assert_eq!($tx, deserialized_tx);
         };
     }
 
@@ -711,4 +743,8 @@ pub fn derive_transactions(
     roundtrip!(spend_tx, SpendTransaction);
 
     Ok(())
+}
+
+pub fn seed_rng(seed: u64) {
+    fastrand::seed(seed);
 }

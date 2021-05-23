@@ -521,8 +521,8 @@ pub fn spend_tx_from_deposits<C: secp256k1::Verification>(
     )
 }
 
-#[cfg(test)]
-mod tests_helpers;
+#[cfg(any(test, feature = "fuzz"))]
+pub mod tests_helpers;
 
 #[cfg(test)]
 mod tests {

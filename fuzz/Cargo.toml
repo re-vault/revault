@@ -10,11 +10,13 @@ edition = "2018"
 cargo-fuzz = true
 
 [dependencies]
-libfuzzer-sys = "0.3"
+arbitrary = { version = "1", features = ["derive"] }
+libfuzzer-sys = { version = "0.4", features = ["arbitrary-derive"] }
 secp256k1 = { version = "0.20.1", features = ["global-context"] }
 
 [dependencies.revault_tx]
 path = ".."
+features = ["fuzz"]
 
 # Prevent this from interfering with workspaces
 [workspace]
@@ -23,6 +25,12 @@ members = ["."]
 [[bin]]
 name = "parse_cancel"
 path = "fuzz_targets/parse_cancel.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "transactions_derivation"
+path = "fuzz_targets/transactions_derivation.rs"
 test = false
 doc = false
 
