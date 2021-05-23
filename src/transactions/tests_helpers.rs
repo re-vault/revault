@@ -714,22 +714,29 @@ pub fn derive_transactions(
     }
     spend_tx.finalize(&secp)?;
 
-    #[cfg(feature = "use-serde")]
-    {
-        macro_rules! roundtrip {
-            ($tx:ident) => {
+    macro_rules! roundtrip {
+        ($tx:ident, $tx_type:ident) => {
+            #[cfg(feature = "use-serde")]
+            {
                 let serialized_tx = serde_json::to_string(&$tx).unwrap();
                 let deserialized_tx = serde_json::from_str(&serialized_tx).unwrap();
                 assert_eq!($tx, deserialized_tx);
-            };
-        }
+            }
 
-        roundtrip!(cancel_tx);
-        roundtrip!(emergency_tx);
-        roundtrip!(unvault_tx);
-        roundtrip!(unemergency_tx);
-        roundtrip!(spend_tx);
+            #[cfg(not(feature = "use-serde"))]
+            {
+                let serialized_tx = $tx.to_string();
+                let deserialized_tx: $tx_type = FromStr::from_str(&serialized_tx).unwrap();
+                assert_eq!($tx, deserialized_tx);
+            }
+        };
     }
+
+    roundtrip!(cancel_tx, CancelTransaction);
+    roundtrip!(emergency_tx, EmergencyTransaction);
+    roundtrip!(unvault_tx, UnvaultTransaction);
+    roundtrip!(unemergency_tx, UnvaultEmergencyTransaction);
+    roundtrip!(spend_tx, SpendTransaction);
 
     Ok(())
 }
