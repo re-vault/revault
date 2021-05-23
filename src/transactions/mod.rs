@@ -543,6 +543,11 @@ mod tests {
             "39a8212c6a9b467680d43e47b61b8363fe1febb761f9f548eb4a432b2bc9bbec:0",
         )
         .unwrap();
+        let feebump_prevout = OutPoint::from_str(
+            "4bb4545bb4bc8853cb03e42984d677fbe880c81e7d95609360eed0d8f45b52f8:0",
+        )
+        .unwrap();
+        let feebump_value = 56730;
         let unvaults_spent = vec![
             (
                 OutPoint::from_str(
@@ -582,6 +587,8 @@ mod tests {
                 csv,
                 deposit_prevout,
                 234_631,
+                feebump_prevout,
+                feebump_value,
                 unvaults_spent.clone(),
                 &secp
             )
@@ -596,6 +603,8 @@ mod tests {
             SEQUENCE_LOCKTIME_MASK + 1,
             deposit_prevout,
             300_000,
+            feebump_prevout,
+            feebump_value,
             unvaults_spent.clone(),
             &secp,
         )
@@ -608,6 +617,8 @@ mod tests {
             csv,
             deposit_prevout,
             234_632,
+            feebump_prevout,
+            feebump_value,
             unvaults_spent.clone(),
             &secp,
         )
@@ -622,6 +633,8 @@ mod tests {
             csv,
             deposit_prevout,
             COIN_VALUE,
+            feebump_prevout,
+            feebump_value,
             unvaults_spent.clone(),
             &secp,
         )
@@ -636,6 +649,8 @@ mod tests {
             csv,
             deposit_prevout,
             100_000 * COIN_VALUE,
+            feebump_prevout,
+            feebump_value,
             unvaults_spent.clone(),
             &secp,
         )
@@ -650,6 +665,8 @@ mod tests {
             csv,
             deposit_prevout,
             100 * COIN_VALUE,
+            feebump_prevout,
+            feebump_value,
             unvaults_spent,
             &secp,
         )

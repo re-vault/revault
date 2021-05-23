@@ -6,7 +6,7 @@ use super::{
 
 use crate::{error::*, scripts::*, txins::*, txouts::*};
 
-use std::{iter::repeat_with, str::FromStr};
+use std::iter::repeat_with;
 
 use miniscript::{
     bitcoin::{
@@ -147,6 +147,8 @@ pub fn derive_transactions(
     csv: u32,
     deposit_prevout: OutPoint,
     deposit_value: u64,
+    feebump_prevout: OutPoint,
+    feebump_value: u64,
     // Outpoint and amount of inputs of a Spend
     unvault_spends: Vec<(OutPoint, u64)>,
     secp: &secp256k1::Secp256k1<secp256k1::All>,
@@ -252,14 +254,11 @@ pub fn derive_transactions(
         version: 2,
         lock_time: 0,
         input: vec![TxIn {
-            previous_output: OutPoint::from_str(
-                "4bb4545bb4bc8853cb03e42984d677fbe880c81e7d95609360eed0d8f45b52f8:0",
-            )
-            .unwrap(),
+            previous_output: feebump_prevout,
             ..TxIn::default()
         }],
         output: vec![TxOut {
-            value: 56730,
+            value: feebump_value,
             script_pubkey: feebump_descriptor.script_pubkey(),
         }],
     };
