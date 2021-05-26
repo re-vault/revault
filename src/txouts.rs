@@ -11,22 +11,40 @@ use crate::{
 };
 
 use miniscript::{
-    bitcoin::{Script, TxOut},
+    bitcoin::{Amount, Script, TxOut},
     DescriptorTrait,
 };
 
 use std::fmt;
 
-/// A transaction output created by a Revault transaction.
+/// Any output of a Revault transaction.
 pub trait RevaultTxOut: fmt::Debug + Clone + PartialEq {
     /// Get a reference to the inner txout
     fn txout(&self) -> &TxOut;
+
     /// Get the actual inner txout
     fn into_txout(self) -> TxOut;
+}
+
+/// An output of a Revault transaction that we manage "internally", ie for which we have the
+/// descriptor.
+pub trait RevaultInternalTxOut: fmt::Debug + Clone + PartialEq + RevaultTxOut {
     /// Get a reference to the inner witness script ("redeem Script of the witness program")
-    fn witness_script(&self) -> &Option<Script>;
+    fn witness_script(&self) -> &Script;
+
     /// Get the actual inner witness script ("redeem Script of the witness program")
-    fn into_witness_script(self) -> Option<Script>;
+    fn into_witness_script(self) -> Script;
+
+    /// Get the maximum size, in weight units, a satisfaction for this scriptPubKey would cost.
+    fn max_sat_weight(&self) -> usize {
+        miniscript::descriptor::Wsh::new(
+            miniscript::Miniscript::parse(self.witness_script())
+                .expect("The witness_script is always created from a Miniscript"),
+        )
+        .expect("The witness_script is always a P2WSH")
+        .max_satisfaction_weight()
+        .expect("It's a sane Script, derived from a Miniscript")
+    }
 }
 
 macro_rules! implem_revault_txout {
@@ -35,7 +53,7 @@ macro_rules! implem_revault_txout {
         #[derive(Debug, Clone, PartialEq, Default)]
         pub struct $struct_name {
             txout: TxOut,
-            witness_script: Option<Script>,
+            witness_script: Script,
         }
 
         impl RevaultTxOut for $struct_name {
@@ -46,12 +64,14 @@ macro_rules! implem_revault_txout {
             fn into_txout(self) -> TxOut {
                 self.txout
             }
+        }
 
-            fn witness_script(&self) -> &Option<Script> {
+        impl RevaultInternalTxOut for $struct_name {
+            fn witness_script(&self) -> &Script {
                 &self.witness_script
             }
 
-            fn into_witness_script(self) -> Option<Script> {
+            fn into_witness_script(self) -> Script {
                 self.witness_script
             }
         }
@@ -66,13 +86,13 @@ implem_revault_txout!(
 );
 impl DepositTxOut {
     /// Create a new DepositTxOut out of the given Deposit script descriptor
-    pub fn new(value: u64, script_descriptor: &DerivedDepositDescriptor) -> DepositTxOut {
+    pub fn new(value: Amount, script_descriptor: &DerivedDepositDescriptor) -> DepositTxOut {
         DepositTxOut {
             txout: TxOut {
-                value,
+                value: value.as_sat(),
                 script_pubkey: script_descriptor.inner().script_pubkey(),
             },
-            witness_script: Some(script_descriptor.inner().explicit_script()),
+            witness_script: script_descriptor.inner().explicit_script(),
         }
     }
 }
@@ -80,31 +100,37 @@ impl DepositTxOut {
 implem_revault_txout!(UnvaultTxOut, doc = "*The* Unvault transaction output.");
 impl UnvaultTxOut {
     /// Create a new UnvaultTxOut out of the given Unvault script descriptor
-    pub fn new(value: u64, script_descriptor: &DerivedUnvaultDescriptor) -> UnvaultTxOut {
+    pub fn new(value: Amount, script_descriptor: &DerivedUnvaultDescriptor) -> UnvaultTxOut {
         UnvaultTxOut {
             txout: TxOut {
-                value,
+                value: value.as_sat(),
                 script_pubkey: script_descriptor.inner().script_pubkey(),
             },
-            witness_script: Some(script_descriptor.inner().explicit_script()),
+            witness_script: script_descriptor.inner().explicit_script(),
         }
     }
 }
 
-implem_revault_txout!(
-    EmergencyTxOut,
-    doc = "The Emergency Deep Vault, the destination of the Emergency transactions fund."
-);
+/// The Emergency Deep Vault, the destination of the Emergency transactions fund.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct EmergencyTxOut(TxOut);
 impl EmergencyTxOut {
     /// Create a new EmergencyTxOut, note that we don't know the witness_script!
-    pub fn new(address: EmergencyAddress, value: u64) -> EmergencyTxOut {
-        EmergencyTxOut {
-            txout: TxOut {
-                script_pubkey: address.address().script_pubkey(),
-                value,
-            },
-            witness_script: None,
-        }
+    pub fn new(address: EmergencyAddress, value: Amount) -> EmergencyTxOut {
+        EmergencyTxOut(TxOut {
+            script_pubkey: address.address().script_pubkey(),
+            value: value.as_sat(),
+        })
+    }
+}
+
+impl RevaultTxOut for EmergencyTxOut {
+    fn txout(&self) -> &TxOut {
+        &self.0
+    }
+
+    fn into_txout(self) -> TxOut {
+        self.0
     }
 }
 
@@ -115,21 +141,20 @@ implem_revault_txout!(
 );
 impl CpfpTxOut {
     /// Create a new CpfpTxOut out of the given Cpfp descriptor
-    pub fn new(value: u64, script_descriptor: &DerivedCpfpDescriptor) -> CpfpTxOut {
+    pub fn new(value: Amount, script_descriptor: &DerivedCpfpDescriptor) -> CpfpTxOut {
         CpfpTxOut {
             txout: TxOut {
-                value,
+                value: value.as_sat(),
                 script_pubkey: script_descriptor.inner().script_pubkey(),
             },
-            witness_script: Some(script_descriptor.inner().explicit_script()),
+            witness_script: script_descriptor.inner().explicit_script(),
         }
     }
 }
 
-implem_revault_txout!(
-    FeeBumpTxOut,
-    doc = "The output spent by the revocation transactions to bump their feerate"
-);
+/// The output spent by the revocation transactions to bump their feerate
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct FeeBumpTxOut(TxOut);
 impl FeeBumpTxOut {
     /// Create a new FeeBumpTxOut, note that it's managed externally so we don't need a witness
     /// Script.
@@ -138,26 +163,17 @@ impl FeeBumpTxOut {
             return Err(TxoutCreationError::InvalidScriptPubkeyType);
         }
 
-        Ok(FeeBumpTxOut {
-            txout,
-            witness_script: None,
-        })
+        Ok(FeeBumpTxOut(txout))
     }
 }
 
-implem_revault_txout!(
-    ExternalTxOut,
-    doc = "An untagged external output, as spent / created by the \
-            [Deposit](crate::transactions::DepositTransaction) or created by the \
-            [Spend](crate::transactions::SpendTransaction)."
-);
-impl ExternalTxOut {
-    /// Create an external txout, hence without a witness script.
-    pub fn new(txout: TxOut) -> ExternalTxOut {
-        ExternalTxOut {
-            txout,
-            witness_script: None,
-        }
+impl RevaultTxOut for FeeBumpTxOut {
+    fn txout(&self) -> &TxOut {
+        &self.0
+    }
+
+    fn into_txout(self) -> TxOut {
+        self.0
     }
 }
 
@@ -167,7 +183,7 @@ impl ExternalTxOut {
 pub enum SpendTxOut {
     /// The actual destination of the funds, many such output can be present in a Spend
     /// transaction
-    Destination(ExternalTxOut),
+    Destination(TxOut),
     /// The change output, usually only one such output is present in a Spend transaction
     Change(DepositTxOut),
 }

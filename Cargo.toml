@@ -3,6 +3,7 @@ name = "revault_tx"
 version = "0.2.1"
 authors = ["Antoine Poinsot <darosior@protonmail.com>"]
 edition = "2018"
+rust = "1.43"
 repository = "https://github.com/revault/revault_tx"
 license-file = "LICENCE"
 keywords = ["revault", "bitcoin", "vault"]

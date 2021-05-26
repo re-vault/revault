@@ -53,6 +53,11 @@ be reviewed first on the conceptual level before focusing on code style or gramm
 fixes.
 
 
+## MSRV
+
+Each commit must (usually) build and pass the test on Rust `1.43`.
+
+
 ## Style
 
 To avoid endless bikeshedding, just use [`rustfmt`](https://github.com/rust-lang/rustfmt).

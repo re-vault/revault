@@ -6,6 +6,10 @@ Bitcoin vault architecture for multi-party situations.
 This library defines the Miniscript descriptors and handles PSBT management of
 Revault-specific transactions.
 
+# Minimum Supported Rust Version
+
+This library should always compile with any combination of features on **Rust 1.43**.
+
 
 # Contributing
 

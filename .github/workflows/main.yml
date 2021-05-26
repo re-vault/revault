@@ -6,10 +6,9 @@ jobs:
   unittesting:
     strategy:
       matrix:
-        # We don't have a MSRV (yet?)
         toolchain:
+          - 1.43
           - stable
-          - nightly
         os:
           - ubuntu-latest
           - macOS-latest

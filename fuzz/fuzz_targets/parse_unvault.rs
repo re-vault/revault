@@ -27,25 +27,31 @@ fuzz_target!(|data: &[u8]| {
 
         if !tx.is_finalized() {
             // We can compute the sighash for the first unvault input
-            tx.signature_hash_internal_input(0, SigHashType::All)
+            tx.signature_hash(0, SigHashType::All)
                 .expect("Must be in bound as it was parsed!");
             // And add a signature
-            tx.add_signature(0, dummykey, (dummy_sig, SigHashType::All))
-                .expect("This does not check the signature");
+            assert!(tx
+                .add_signature(0, dummykey, (dummy_sig, SigHashType::All), &SECP256K1)
+                .unwrap_err()
+                .to_string()
+                .contains("Invalid signature"));
         } else {
             // But not if it's final
-            tx.signature_hash_internal_input(0, SigHashType::All)
-                .expect_err("Already final");
-            tx.add_signature(0, dummykey, (dummy_sig, SigHashType::All))
-                .expect_err("Already final");
+            assert!(tx
+                .signature_hash(0, SigHashType::All)
+                .unwrap_err()
+                .to_string()
+                .contains("Missing witness_script"));
+            assert!(tx.add_signature(0, dummykey, (dummy_sig, SigHashType::All), &SECP256K1)
+                .unwrap_err()
+                .to_string()
+                .contains("already finalized"));
         }
 
         // And verify the input without crashing (will likely fail though)
-        #[allow(unused_must_use)]
-        tx.verify_input(0);
+        tx.verify_inputs().unwrap_or_else(|_| ());
 
         // Same for the finalization
-        #[allow(unused_must_use)]
-        tx.finalize(&SECP256K1);
+        tx.finalize(&SECP256K1).unwrap_or_else(|_| ());
     }
 });

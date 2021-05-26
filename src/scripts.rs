@@ -34,7 +34,8 @@ use std::{
 use serde::de;
 
 /// Flag applied to the nSequence and CSV value before comparing them.
-/// https://github.com/bitcoin/bitcoin/blob/4a540683ec40393d6369da1a9e02e45614db936d/src/primitives/transaction.h#L87-L89
+///
+/// <https://github.com/bitcoin/bitcoin/blob/4a540683ec40393d6369da1a9e02e45614db936d/src/primitives/transaction.h#L87-L89>
 pub const SEQUENCE_LOCKTIME_MASK: u32 = 0x00_00_ff_ff;
 
 // These are useful to create TxOuts out of the right Script descriptor
