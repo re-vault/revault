@@ -116,6 +116,17 @@ pub trait RevaultTransaction: fmt::Debug + Clone + PartialEq {
                 .witness_script
                 .as_ref()
                 .ok_or(InputSatisfactionError::MissingWitnessScript)?;
+            use miniscript::bitcoin::hashes::hex::ToHex;
+            eprintln!(
+                "Tx: '{}', index: '{}', Witscript: '{}', value: '{}', type: '{}', hash: '{}', hash2: '{}'",
+                miniscript::bitcoin::consensus::encode::serialize_hex(self.tx()),
+                input_index,
+                witscript.to_bytes().to_hex(),
+                prev_txo.value,
+                sighash_type,
+                cache.signature_hash(input_index, &witscript, prev_txo.value, sighash_type),
+                SigHashCache::new(self.tx()).signature_hash(input_index, &witscript, prev_txo.value, sighash_type)
+            );
             Ok(cache.signature_hash(input_index, &witscript, prev_txo.value, sighash_type))
         } else {
             assert!(
@@ -674,6 +685,87 @@ mod tests {
             "Tx chain with 38 stakeholders, 5 manager, {} csv, 100_000_000_000 deposit",
             csv
         ));
+    }
+
+    #[test]
+    fn repro() {
+        use miniscript::bitcoin::{hashes::Hash, Txid};
+
+        let secp = secp256k1::Secp256k1::new();
+
+        let deposit_txid = [
+            2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 17, 39, 0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 0,
+            0, 0, 0, 12,
+        ];
+        let deposit_outpoint = OutPoint {
+            txid: Txid::from_slice(&deposit_txid).unwrap(),
+            vout: 0,
+        };
+        let feebump_txid = [
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 226, 145, 227, 255, 255, 255, 255, 255, 255, 255, 255,
+            255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+        ];
+        let feebump_outpoint = OutPoint {
+            txid: Txid::from_slice(&feebump_txid).unwrap(),
+            vout: 0,
+        };
+        let deposit_value = 1065135112192;
+        let feebump_value = 18446744073709551615;
+
+        let unvault_txid_a = [
+            255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+            255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 42, 255,
+        ];
+        let unvault_a = OutPoint {
+            txid: Txid::from_slice(&unvault_txid_a).unwrap(),
+            vout: 4294967295,
+        };
+        let unvault_value_a = 2377900603251621887;
+
+        let unvault_txid_b = [
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 172, 255, 255, 255, 1, 136, 98, 189, 244,
+            2, 2, 2, 2, 2, 2, 2, 2,
+        ];
+        let unvault_b = OutPoint {
+            txid: Txid::from_slice(&unvault_txid_b).unwrap(),
+            vout: 33686018,
+        };
+        let unvault_value_b = 7451037802315252226;
+
+        derive_transactions(
+            2,
+            8,
+            3,
+            deposit_outpoint,
+            deposit_value,
+            feebump_outpoint,
+            feebump_value,
+            vec![(unvault_a, unvault_value_a), (unvault_b, unvault_value_b)],
+            &secp,
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn repro2() {
+        use miniscript::bitcoin::{
+            blockdata::transaction::SigHashType, consensus::encode::deserialize,
+            hashes::hex::FromHex, util::bip143::SigHashCache, Script, Transaction,
+        };
+        let tx_bytes = Vec::<u8>::from_hex("020000000182000000000000000000000000000000000000000000000000000000000000000000000000fdffffff0170ccfffef7000000220020b20000000000000000000000000000000000000000000000000000000000000000000000").unwrap();
+        let tx: Transaction = deserialize(&tx_bytes).unwrap();
+        let witscript = Script::from_hex("522103b50000000000000000000000000000014551231950b75fc4402da1732fc9bebf2103a90000000000000000000000000000014551231950b75fc4402da1732fc9bebf52ae").unwrap();
+        let value = 1065135112192;
+
+        let sighash_all =
+            SigHashCache::new(&tx).signature_hash(0, &witscript, value, SigHashType::All);
+        let sighash_acp = SigHashCache::new(&tx).signature_hash(
+            0,
+            &witscript,
+            value,
+            SigHashType::AllPlusAnyoneCanPay,
+        );
+        assert_ne!(sighash_all, sighash_acp,);
     }
 
     // Small sanity checks, see fuzzing targets for more.
